@@ -5,16 +5,17 @@
 # See documentation in:
 # https://doc.scrapy.org/en/latest/topics/spider-middleware.html
 
-from scrapy import signals
+import time
 from logging import getLogger
+
+from scrapy import signals
+from scrapy.http import HtmlResponse
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.wait import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from scrapy.http import HtmlResponse
 from selenium.webdriver.chrome.options import Options
-import time
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.wait import WebDriverWait
 
 
 class QcwySpiderMiddleware(object):
@@ -111,26 +112,26 @@ class QcwyDownloaderMiddleware(object):
     def spider_opened(self, spider):
         spider.logger.info('Spider opened: %s' % spider.name)
 
+
 class SeleniumMiddleware(object):
-    def __init__(self,timeout=None):
-        self.logger=getLogger(__name__)
-        self.timeout=timeout
+    def __init__(self, timeout=None):
+        self.logger = getLogger(__name__)
+        self.timeout = timeout
         self.chrome_options = Options()
-        self.browser=webdriver.Chrome()
-        self.browser.set_window_size(1400,700)
+        self.browser = webdriver.Chrome('/usr/local/bin/chromedriver', chrome_options=self.chrome_options)
+        self.browser.set_window_size(1400, 700)
         self.browser.set_page_load_timeout(self.timeout)
-        self.wait=WebDriverWait(self.browser,self.timeout)
+        self.wait = WebDriverWait(self.browser, self.timeout)
 
     def __del__(self):
         self.browser.close()
 
-
-    def process_request(self,request,spider):
+    def process_request(self, request, spider):
         KEYWORD = 'python'
-        print('请求链接',request.url)
+        print('请求链接', request.url)
         self.logger.debug('Chrome is Starting')
         self.browser.get(request.url)  # 打开浏览器输入网址
-        if request.url=='https://www.51job.com/':  #如果打开的网页是首页就进行登陆，搜索，返回url，网页源码；否则直接返回url，网页源码
+        if request.url == 'https://www.51job.com/':  # 如果打开的网页是首页就进行登陆，搜索，返回url，网页源码；否则直接返回url，网页源码
 
             try:
                 '''
@@ -157,41 +158,43 @@ class SeleniumMiddleware(object):
                 ))#等找到确认登录按钮
                 sub.click()
                 '''
-                #若要模拟登陆，请放开'''  '''里的代码
-                
+                # 若要模拟登陆，请放开'''  '''里的代码
+
                 time.sleep(1)
                 sou = self.wait.until(EC.presence_of_element_located(
                     (By.CSS_SELECTOR, '#kwdselectid')
-                ))#找到搜索框
+                ))  # 找到搜索框
                 di = self.wait.until(EC.presence_of_element_located(
                     (By.CSS_SELECTOR, '#work_position_input')
-                ))#找到地区选择按钮
+                ))  # 找到地区选择按钮
 
                 sousub = self.wait.until(EC.element_to_be_clickable(
                     (By.CSS_SELECTOR, 'body > div.content > div > div.fltr.radius_5 > div > button')
-                ))#找到搜索按钮
-                sou.send_keys(KEYWORD)#输入搜索条件
+                ))  # 找到搜索按钮
+                sou.send_keys(KEYWORD)  # 输入搜索条件
                 time.sleep(1)
                 di.click()
                 time.sleep(0.5)
                 dis = self.wait.until(EC.presence_of_element_located(
                     (By.CSS_SELECTOR, '.ttag')
-                ))#地区选择选择全国
+                ))  # 地区选择选择全国
                 dis.click()
                 dissub = self.wait.until(EC.presence_of_element_located(
                     (By.CSS_SELECTOR, '#work_position_click_bottom_save')
-                ))#确定地区
+                ))  # 确定地区
                 dissub.click()
                 time.sleep(1)
                 sousub.click()
                 time.sleep(5)
-                return HtmlResponse(url=request.url,body=self.browser.page_source,request=request,encoding='utf-8',status=200) #返回url，网页源码
+                return HtmlResponse(url=request.url, body=self.browser.page_source, request=request, encoding='utf-8',
+                                    status=200)  # 返回url，网页源码
             except TimeoutException:
-                return HtmlResponse(url=request.url,body=self.browser.page_source,status=500,request=request,encoding='utf-8')
+                return HtmlResponse(url=request.url, body=self.browser.page_source, status=500, request=request,
+                                    encoding='utf-8')
         else:
-            return HtmlResponse(url=request.url,body=self.browser.page_source,request=request,encoding='utf-8')
+            return HtmlResponse(url=request.url, body=self.browser.page_source, request=request, encoding='utf-8')
 
     @classmethod
     def from_crawler(cls, crawler):
         return cls(timeout=crawler.settings.get('SELENIUM_TIMEOUT'))
-                   # service_args=crawler.settings.get('PHANTOMJS_SERVICE_ARGS'))
+        # service_args=crawler.settings.get('PHANTOMJS_SERVICE_ARGS'))
